@@ -11,19 +11,21 @@ About 15 minutes. No terminal, nothing to install. You need Telegram, an email a
 
 You don't need to set a description or a command list in BotFather: they are set automatically during setup (and refreshed whenever you send `/connect`).
 
-![BotFather reply with the token](img/01-botfather.png)
+![BotFather reply with the token](img/01-botfather.jpg)
 
 ## 2. Deploy to Cloudflare
 
 1. Click **Deploy to Cloudflare** in the README.
 2. Sign up or log in to Cloudflare. The free plan is enough, and no card is needed.
 3. Connect your GitHub (or GitLab) account when asked. Cloudflare creates a copy of the repo there.
-4. When it asks for `BOT_TOKEN`, paste the token from step 1.
-5. Click **Deploy** and wait about a minute.
+4. Tick **Create private Git repository** if you don't want your copy to be public.
+5. Already running Petty Thief on this Cloudflare account? Change **Project name** (for example `petty-thief-2`) and pick **+ Create new** under the D1 database. Never select a database you already use: the new bot would share it.
+6. When it asks for `BOT_TOKEN`, paste the token from step 1.
+7. Click **Deploy** and wait about a minute.
    If this is your first worker, Cloudflare also registers a free `workers.dev` subdomain for your account; you may be asked to pick its name. It becomes the `<you>` part of the address below.
-6. Copy your bot's address. It looks like `https://petty-thief.<you>.workers.dev`.
+8. Copy your bot's address. It looks like `https://petty-thief.<you>.workers.dev`.
 
-![Deploy screen](img/02-deploy.png)
+![Deploy screen](img/02-deploy.jpg)
 
 ## 3. Open your setup page
 
@@ -31,7 +33,7 @@ You don't need to set a description or a command list in BotFather: they are set
 2. Paste the bot token again. This proves the bot is yours; it isn't stored a second time.
 3. You'll see a one-time code.
 
-![Setup page with the code](img/03-setup.png)
+![Setup page with the code](img/03-setup.jpg)
 
 ## 4. Claim your bot
 
@@ -41,7 +43,7 @@ You don't need to set a description or a command list in BotFather: they are set
 
 Pressing **Start** before you claim only gets the answer "Send /claim <code> from your setup page." That's expected.
 
-![Claim reply](img/04-claim.png)
+![Claim reply](img/04-claim.jpg)
 
 ## 5. Connect Claude Code
 
@@ -49,13 +51,19 @@ Pressing **Start** before you claim only gets the answer "Send /claim <code> fro
 2. Paste it into Claude Code as a normal message. Petty Thief reads it and connects; you never type a command or copy the key anywhere else.
 3. Delete the message in Telegram.
 
-![Claude Code connected](img/05-connect.png)
+![Claude Code connected](img/05-connect.jpg)
 
-## Try it
+## 6. Share links from your phone
 
-Share a TikTok to your bot. It answers `✓ stashed · 1 waiting`. Open Claude Code: it tells you a link is waiting.
+Share a TikTok, a Reel, a repo or an article to your bot. It answers `✓ stashed · 1 waiting`. Next time you open Claude Code, it tells you a link is waiting.
 
-![First stashed link](img/06-claude.png)
+![First stashed link](img/06-share.jpg)
+
+## 7. Get the loot
+
+Say "yes" (or "go through my stash"). Claude breaks each link down, checks the claims at the source, and saves a file you can reuse, plus your list of everything analyzed.
+
+![Analysis in Claude Code](img/07-loot.jpg)
 
 ## If something goes wrong
 

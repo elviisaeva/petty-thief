@@ -37,7 +37,7 @@ Then paste any link and say "steal this". The first time, it asks you up to 5 qu
 
 ## Add the Telegram bot
 
-Follow **[docs/setup.md](docs/setup.md)**: five steps with screenshots, no terminal.
+Follow **[docs/setup.md](docs/setup.md)**: seven steps with screenshots, no terminal.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/elviisaeva/petty-thief/tree/main/worker)
 
