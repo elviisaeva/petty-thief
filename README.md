@@ -43,13 +43,28 @@ Follow **[docs/setup.md](docs/setup.md)**: seven steps with screenshots, no term
 
 ## Lenses: understand a link
 
-| Lens | For | Looks at |
-|---|---|---|
-| `creator` | content makers | hook, structure, editing, on-screen text, comments |
-| `dev` | developers | is it real, how to reproduce, alternatives → Adopt / Try / Skip |
-| `ai` | AI enthusiasts | the workflow, claims vs reality, cost, try it in 10 minutes |
-| `learn` | anyone | the core idea, a mental model, sources, one exercise |
-| `design` | designers | palette, fonts, layout, spacing, UI patterns, each tagged with where it came from |
+| Lens | For | Looks at | You also get |
+|---|---|---|---|
+| `creator` | content makers | hook, structure, editing, on-screen text, comments | **Steal this** (one reusable technique) and **your own hook** |
+| `dev` | developers | is it real, how it works, how to reproduce, alternatives | **Adopt / Try / Skip** with one sentence why |
+| `ai` | AI enthusiasts | the workflow, claims vs reality, cost, try it in 10 minutes | **Worth trying?** Yes / Later / No |
+| `learn` | anyone | the core idea, a mental model, sources, one exercise | **One exercise**: a 15-minute task to make it stick |
+| `design` | designers | palette, fonts, layout, spacing, UI patterns, each tagged with where it came from | **Steal this**: the one move to reuse, without copying |
+
+### What every analysis contains
+
+One Markdown file per link, in your language:
+
+- **Seen / Not seen**: what Claude actually looked at (caption, page, repo, frames) and what it couldn't see. It never describes what it didn't see.
+- **What it is** and **why it works**.
+- **The lens's key finding**: the hook for `creator`, "does it exist?" for `dev`, and so on, plus a breakdown (by second or slide in deep mode).
+- **Numbers**: only the ones that are visible, otherwise "not visible".
+- **Your sections**: the ones you chose at setup, e.g. "For my content" and "For my workflow".
+- **The lens's verdict** from the table above.
+- **Not verified**: claims Claude couldn't confirm at the source.
+- **Stash**: patterns worth remembering, also collected across all links in `_stash.md`.
+
+Collections work differently: they give you a short card (facts plus the link, never the full text) and a line in your list.
 
 ## Collections: keep things
 
