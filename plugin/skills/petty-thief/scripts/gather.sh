@@ -159,7 +159,7 @@ fi
 check_url "$url" || die "url rejected: must be http(s), one line, no spaces, backslashes or control characters"
 url_ok "$url" || die "url rejected: local, private or link-local address (or credentials in the url)"
 
-UA='Mozilla/5.0 (compatible; PettyThief/0.4.2; +https://github.com/elviisaeva/petty-thief)'
+UA='Mozilla/5.0 (compatible; PettyThief/0.4.3; +https://github.com/elviisaeva/petty-thief)'
 MAXBYTES=4000000
 TEXT_CAP=60000
 SMALL_CAP=8000
