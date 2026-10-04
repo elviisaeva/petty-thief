@@ -35,6 +35,18 @@ claude plugin install petty-thief@petty-thief
 
 Then paste any link and say "steal this". The first time, it asks you up to 5 questions about what you want from links.
 
+### The first-run questions
+
+Not at install, but the first time you paste a link (or open your stash), Claude asks once, in one message, with defaults:
+
+1. **What will you send here?** Pick any: content ideas (`creator`), tools and repos (`dev`), AI workflows (`ai`), learning (`learn`), design references (`design`), things to watch (`watchlist`), recipes, reading, or something else (it offers to make your own lens or collection).
+2. **Who are you and who do you make things for?** One concrete example of your work makes the advice much better.
+3. **Which sections do you want in each analysis?** It suggests two, like "For my content" and "For my workflow".
+4. **Language and folder** for your loot (default: English, `~/Petty Thief`).
+5. **May it use deep tools when you ask?** Downloading a video, transcribing it, looking while logged in. Even if you allow it, it still asks you for each item.
+
+Picked only collections (recipes, watchlist, reading)? Then it asks just 2 questions (1 and 4). Your answers become your profile; change anything later in plain words ("switch my analyses to Spanish", "add a lens for UX research"). The bot is separate: set it up only if you want it.
+
 ## Add the Telegram bot
 
 Follow **[docs/setup.md](docs/setup.md)**: seven steps with screenshots, no terminal.
