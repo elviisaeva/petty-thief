@@ -154,7 +154,7 @@ One bot serves many projects. In Telegram, a note may carry `*name` (for example
 |---|---|
 | Web fetch tool | Use `curl -sL -m 20 '<url>'` with the extraction commands in `reference/gather.md`. Without a shell, ask the user to paste the caption or text. |
 | oEmbed blocked | Use page meta tags, then the note. Say what was unavailable. |
-| Browser | Skip tier 1 and say what wasn't seen. |
+| Browser | Skip tier 1 and say what wasn't seen. Behance and Dribbble open only in the user's Chrome (Claude in Chrome): see `reference/design-extract.md` → Blocked pages. |
 | yt-dlp or ffmpeg | No frame mode. Use captions or subtitles and label the result "not frame-verified". Offer `brew install yt-dlp ffmpeg` once, and install only after a yes. |
 | whisper | Quote from subtitles and mark the quotes approximate. |
 | Artifact tools | No collection page. Say once why, and keep the markdown list. |

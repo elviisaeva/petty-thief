@@ -15,7 +15,8 @@
 | X | `curl -s "https://publish.twitter.com/oembed?url=<url>"` | The note only |
 | Instagram | `og:` meta tags of the page (often blocked without login) | The note only. oEmbed needs an app token; do not use one. |
 | Threads, LinkedIn | `og:` meta tags of the page | The note only |
-| Dribbble, Behance, Pinterest, Mobbin | `og:` meta tags (title, author, `og:image`) | The note only; see `design-extract.md` |
+| Dribbble, Behance | Nothing: both block plain requests with a bot check | Your own Chrome, with the Claude in Chrome extension connected (tier 1, gentle mode, your yes per link) |
+| Pinterest, Mobbin | `og:` meta tags (title, author, `og:image`) | The note only; see `design-extract.md` |
 | GitHub | `gh api repos/<owner>/<repo>` (read-only) or `https://api.github.com/repos/<owner>/<repo>` | README via `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/README.md` |
 | Recipe sites | JSON-LD `Recipe` block | `og:` meta tags |
 | Articles | Web fetch or the capped `curl` above | The note only |

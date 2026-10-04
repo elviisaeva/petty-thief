@@ -159,7 +159,7 @@ fi
 check_url "$url" || die "url rejected: must be http(s), one line, no spaces, backslashes or control characters"
 url_ok "$url" || die "url rejected: local, private or link-local address (or credentials in the url)"
 
-UA='Mozilla/5.0 (compatible; PettyThief/0.4.0; +https://github.com/elviisaeva/petty-thief)'
+UA='Mozilla/5.0 (compatible; PettyThief/0.4.1; +https://github.com/elviisaeva/petty-thief)'
 MAXBYTES=4000000
 TEXT_CAP=60000
 SMALL_CAP=8000
@@ -299,6 +299,9 @@ fetch() {
     u=$loc
   done
 }
+
+# Behance and Dribbble answer plain requests with a bot check (403, or an empty 202).
+needs_chrome() { note "this site blocks plain requests (bot check): only the user's Chrome can open it, see reference/design-extract.md → Blocked pages"; }
 
 why() { case "$1" in [0-9][0-9][0-9]) printf 'HTTP %s' "$1" ;; *) printf '%s' "$1" ;; esac; }
 
@@ -492,6 +495,7 @@ case "$code" in
   *)
     printf '\n== page\nunavailable (%s)\n' "$(why "$code")"
     note "page unavailable ($(why "$code")): use the note, say what was unavailable"
+    [ "$platform" = design-image ] && needs_chrome
     finish
     ;;
 esac
@@ -499,6 +503,7 @@ esac
 printf '\n== meta\n'
 meta_tags "$tmp/page" > "$tmp/meta"
 if [ -s "$tmp/meta" ]; then untrusted < "$tmp/meta"; else printf 'none\n'; fi
+[ "$platform" = design-image ] && [ ! -s "$tmp/meta" ] && needs_chrome
 
 json_ld "$tmp/page" > "$tmp/ld"
 nld=$(grep -c . "$tmp/ld" 2>/dev/null || true)

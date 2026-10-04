@@ -40,6 +40,8 @@ function server() {
     if (u.pathname === "/article") return html(ARTICLE);
     if (u.pathname === "/recipe") return html(RECIPE);
     if (u.pathname === "/gone") { res.writeHead(404); return res.end("nope"); }
+    if (u.pathname === "/challenge403") { res.writeHead(403); return res.end("<script>window.location.reload()</script>"); }
+    if (u.pathname === "/challenge202") { res.writeHead(202); return res.end(); }
     if (u.pathname === "/oembed") {
       res.setHeader("content-type", "application/json");
       return res.end(JSON.stringify({ title: "Clip", author_name: "someone", type: "video", html: "<iframe>EMBED_HTML</iframe>", got: u.searchParams.get("url") }));
@@ -117,6 +119,18 @@ test("a dead page is reported, not fatal", async () => {
   s.close();
   assert.equal(r.code, 0);
   assert.match(r.stdout, /unavailable \(HTTP 404\)/);
+});
+
+test("Behance/Dribbble bot check (403 or empty 202) points to the user's Chrome", async () => {
+  const s = await server();
+  for (const path of ["/challenge403", "/challenge202"]) {
+    const r = await gather([`${s.url}${path}`], { PT_GATHER_PLATFORM: "design-image" });
+    assert.equal(r.code, 0);
+    assert.match(r.stdout, /bot check\): only the user's Chrome can open it/);
+  }
+  const plain = await gather([`${s.url}/challenge403`]);
+  assert.doesNotMatch(plain.stdout, /bot check/);
+  s.close();
 });
 
 test("oEmbed: url sent url-encoded, embed html dropped", async () => {

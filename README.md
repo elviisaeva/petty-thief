@@ -111,6 +111,7 @@ Everything personal lives in `~/.petty-thief/profile.yaml`. The skill is plain M
 
 - The bot stores link text only. It never touches TikTok, Instagram or anything else.
 - Analysis uses public, no-login data by default. Logged-in looking runs only in **gentle mode**, with your yes for each item.
+- **Behance and Dribbble** block plain requests, so they open only in your own Chrome: install the [Claude in Chrome](https://claude.com/chrome) extension and connect it with `/chrome`. Without it you get a card with your note only.
 - Your keys stay yours: the bot token is an encrypted Cloudflare secret; the key that connects Claude Code is stored only on your computer (and appears once in your local Claude Code history, because you paste it; `/rotate` replaces it); the bot answers only you.
 
 Read [docs/safety.md](docs/safety.md) before turning on deep mode. Questions about updating, uninstalling or Windows: [docs/faq.md](docs/faq.md).

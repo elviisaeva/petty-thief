@@ -30,7 +30,8 @@ Every `'<url>'` below is single-quoted with each `'` in the value replaced by `'
 | X | `curl -q -sG -m 20 --max-filesize 4000000 --data-urlencode 'url=<url>' 'https://publish.twitter.com/oembed'` | The note only |
 | Instagram | `og:` meta tags of the page (often blocked without login) | The note only. oEmbed needs an app token; do not use one. |
 | Threads, LinkedIn | `og:` meta tags of the page | The note only |
-| Dribbble, Behance, Pinterest, Mobbin | `og:` meta tags (title, author, `og:image`) | The note only; see `design-extract.md` |
+| Dribbble, Behance | Blocked for plain requests (bot check) | The user's Chrome only, tier 1: `design-extract.md` → Blocked pages |
+| Pinterest, Mobbin | `og:` meta tags (title, author, `og:image`) | The note only; see `design-extract.md` |
 | GitHub | `gh api 'repos/<owner>/<repo>'` (read-only, fields above) or `curl -s 'https://api.github.com/repos/<owner>/<repo>'` | README via `curl -sL 'https://raw.githubusercontent.com/<owner>/<repo>/HEAD/README.md'` |
 | Recipe sites | JSON-LD `Recipe` block | `og:` meta tags |
 | Articles | Web fetch or the capped `curl` above | The note only |
