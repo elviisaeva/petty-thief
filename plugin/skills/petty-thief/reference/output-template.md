@@ -31,7 +31,7 @@ With several analysis lenses, keep the shared sections once (What it is, Numbers
 <the patterns added to _stash.md, or "none">
 ```
 
-Quick depth keeps the whole file to about 15 lines of content.
+Quick depth keeps the whole file to about 15 lines of content. The design lens on a case (Behance, Dribbble, a portfolio) may run longer: its logo, screen, motion and case-structure sections are the point.
 
 `_index.md` (create it with this header if missing, then append one row per analysis):
 
