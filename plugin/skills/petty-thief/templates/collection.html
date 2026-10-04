@@ -1,0 +1,138 @@
+<title>__TITLE__</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a shelf list — one column of items, status pills as filters, tap a box to finish an item */
+:root{--bg:#F6F5F2;--surface:#FFFFFF;--ink:#1B1A17;--muted:#6B6860;--line:#E3E0D8;--accent:__ACCENT__;--done:#8A877F;
+--display:"Fraunces",Georgia,serif;--body:"Instrument Sans",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151513;--surface:#1E1D1A;--ink:#EDEBE5;--muted:#A19E95;--line:#2E2D29;--done:#6F6C64;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151513;--surface:#1E1D1A;--ink:#EDEBE5;--muted:#A19E95;--line:#2E2D29;--done:#6F6C64;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
+.wrap{max-width:680px;margin:0 auto;padding-inline:16px;padding-block:32px 64px;display:grid;gap:20px}
+h1{font:600 clamp(2rem,7vw,2.8rem)/1.1 var(--display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:0;font-variant-numeric:tabular-nums}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{font:500 .85rem var(--body);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+#q{flex:1 1 160px;min-width:0;font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+li{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:start}
+ul.cards{grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:12px}
+ul.cards li{display:flex;flex-direction:column;gap:8px;padding:0;overflow:hidden}
+ul.cards li > *:not(img){margin-inline:14px}ul.cards li > :last-child{margin-bottom:14px}
+ul.cards img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:var(--line)}
+li.done .t{color:var(--done);text-decoration:line-through}
+input[type=checkbox]{width:22px;height:22px;margin:2px 0 0;accent-color:var(--accent)}
+.t{font-weight:600;min-width:0;overflow-wrap:anywhere}.t a{color:inherit}
+.facts{grid-column:2/4;color:var(--muted);font-size:.92rem;min-width:0}
+.facts p{margin:0}
+.tags{grid-column:2/4;display:flex;flex-wrap:wrap;gap:6px}.tags span{font-size:.78rem;color:var(--muted)}
+select{font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:4px 6px}
+.empty{color:var(--muted);text-align:center;padding:40px 0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:no-preference){li{transition:opacity .2s}}
+</style>
+<div class="wrap">
+  <header><h1>__TITLE__</h1><p class="sub" id="sub">Loading your list…</p></header>
+  <div class="bar" id="bar"><input id="q" type="search" placeholder="Search titles and tags" aria-label="Search"></div>
+  <ul id="list"></ul>
+  <p class="empty" id="empty" hidden>Nothing here yet. Forward a link to your Petty Thief bot, or paste one into Claude Code, and it lands here.</p>
+</div>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const state = { meta: { view: "checklist", statuses: ["to-do", "done"], done_status: "done" }, items: [], filter: "open", q: "" };
+  const isCards = () => state.meta.view === "cards";
+  // Rows can be edited by anyone the page is shared with: allow only web links and our own or https images.
+  const safeHref = (u) => (typeof u === "string" && /^https?:\/\//i.test(u) ? u : null);
+  const safeImg = (u) => (typeof u === "string" && (u.startsWith("/_blob/") || u.startsWith("https://")) ? u : null);
+  // One wrongly typed row must not blank the page: coerce every field once, on the way in.
+  const str = (v) => (v == null ? undefined : String(v));
+  const strs = (v) => (Array.isArray(v) ? v.filter((x) => x != null).map(String) : []);
+  const toItem = (id, raw) => {
+    const d = raw && typeof raw === "object" ? raw : {};
+    return { id: String(id), title: str(d.title), url: str(d.url), image: str(d.image), status: str(d.status), facts: strs(d.facts), tags: strs(d.tags) };
+  };
+  let db = null;
+  try { db = await window.claude?.use?.("db"); } catch { db = null; }
+  if (!db) { $("sub").textContent = "Open this page signed in to claude.ai to see your list."; return; }
+
+  function chips() {
+    const bar = $("bar"); bar.querySelectorAll(".chip").forEach((c) => c.remove());
+    // Checklists filter by status; card libraries filter by tag.
+    const names = isCards()
+      ? ["all", ...[...new Set(state.items.flatMap((i) => i.tags || []))].slice(0, 12).map((t) => "#" + t)]
+      : ["open", ...state.meta.statuses, "all"];
+    for (const n of names) {
+      const b = document.createElement("button");
+      b.className = "chip"; b.type = "button"; b.textContent = n;
+      b.setAttribute("aria-pressed", String(state.filter === n));
+      b.onclick = () => { state.filter = n; render(); };
+      bar.insertBefore(b, $("q"));
+    }
+  }
+  function visible(it) {
+    const q = state.q.trim().toLowerCase();
+    const matches = !q || (it.title || "").toLowerCase().includes(q) || (it.tags || []).some((t) => String(t).toLowerCase().includes(q)) || (it.facts || []).some((f) => String(f).toLowerCase().includes(q));
+    if (isCards()) return matches && (state.filter === "all" || !state.filter.startsWith("#") || (it.tags || []).includes(state.filter.slice(1)));
+    const done = it.status === state.meta.done_status;
+    if (state.filter === "open" && done) return false;
+    if (!["open", "all"].includes(state.filter) && it.status !== state.filter) return false;
+    return matches;
+  }
+  async function setStatus(id, status) {
+    try { await db.doc("items/" + id).update({ status, status_changed: new Date().toISOString() }); }
+    catch (e) { $("sub").textContent = "Couldn't save that change: " + (e?.message || "try again"); }
+  }
+  function render() {
+    chips();
+    const list = $("list"); list.textContent = ""; list.className = isCards() ? "cards" : "";
+    const shown = state.items.filter(visible);
+    const open = state.items.filter((i) => i.status !== state.meta.done_status).length;
+    $("sub").textContent = isCards() ? `${state.items.length} saved` : `${open} open · ${state.items.length} total`;
+    $("empty").hidden = state.items.length > 0;
+    for (const it of shown) {
+      const li = document.createElement("li");
+      const done = it.status === state.meta.done_status;
+      li.className = done ? "done" : "";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = done;
+      cb.setAttribute("aria-label", `Mark ${it.title} as ${state.meta.done_status}`);
+      cb.onchange = () => setStatus(it.id, cb.checked ? state.meta.done_status : state.meta.statuses[0]);
+      const t = document.createElement("div"); t.className = "t";
+      const label = String(it.title || it.url || "Untitled");
+      const href = safeHref(it.url);
+      if (href) { const a = document.createElement("a"); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = label; t.append(a); }
+      else { const span = document.createElement("span"); span.textContent = label; t.append(span); }
+      const sel = document.createElement("select"); sel.setAttribute("aria-label", "Status");
+      for (const s of state.meta.statuses) { const o = document.createElement("option"); o.value = o.textContent = s; o.selected = s === it.status; sel.append(o); }
+      sel.onchange = () => setStatus(it.id, sel.value);
+      const facts = document.createElement("div"); facts.className = "facts";
+      for (const f of (it.facts || []).slice(0, 4)) { const p = document.createElement("p"); p.textContent = f; facts.append(p); }
+      const tags = document.createElement("div"); tags.className = "tags";
+      for (const g of it.tags || []) { const s = document.createElement("span"); s.textContent = "#" + g; tags.append(s); }
+      if (isCards()) {
+        const src = safeImg(it.image);
+        if (src) { const img = document.createElement("img"); img.src = src; img.alt = ""; img.loading = "lazy"; li.append(img); }
+        li.append(t, facts, tags);
+      } else {
+        li.append(cb, t, sel, facts, tags);
+      }
+      list.append(li);
+    }
+  }
+  $("q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
+  db.doc("meta/collection").onSnapshot((snap) => {
+    const m = snap.exists ? snap.data() : null;
+    if (m?.view === "cards") state.meta = { view: "cards", statuses: [], done_status: null };
+    else if (m && Array.isArray(m.statuses) && m.statuses.length) {
+      const statuses = strs(m.statuses);
+      state.meta = { view: "checklist", statuses, done_status: str(m.done_status) || statuses.at(-1) };
+    }
+    if (isCards() && state.filter === "open") state.filter = "all";
+    render();
+  }, () => {});
+  db.collection("items").orderBy("added", "desc").onSnapshot((snap) => {
+    state.items = snap.docs.map((d) => toItem(d.id, d.data()));
+    render();
+  }, (e) => { $("sub").textContent = "Couldn't load the list: " + (e?.message || "unknown error"); });
+})();
+</script>

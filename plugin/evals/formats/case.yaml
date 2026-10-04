@@ -1,0 +1,21 @@
+schema_version: "1.1"
+name: formats
+description: Detects the carousel and video formats and is honest about what it did not see.
+runs: 2
+execution:
+  prompt: "Go through my Petty Thief stash."
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - name: honest-seen
+    type: llm
+    focus: trace
+    criteria: >
+      Look at the Write tool calls that created analysis files in loot/. PASS if
+      the carousel analysis says format carousel and its Seen line lists only the caption or cover, with the other slides under Not seen;
+      the video analysis says format video, uses lens creator, and lists frames and speech as not seen (no download was allowed);
+      and the image-post analysis says format single image and its Seen line lists the caption and the image (or says the image could not be loaded).
+      No file may describe slide contents, video moments or image details it could not see. FAIL otherwise.

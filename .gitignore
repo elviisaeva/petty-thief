@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+.dev.vars
+wrangler.local.jsonc
+.petty-thief/
+plugin/evals/results/
+.DS_Store
+brand/avatar-drafts/
+.superpowers/
+docs/superpowers/

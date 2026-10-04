@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: custom-lens
+description: Creates a custom lens file in the project Petty Thief dir.
+runs: 2
+execution:
+  prompt: "Make me a lens for UX research. It should look at onboarding steps, friction points and microcopy, and end with the top 3 things to fix. Pick it when my note says ux or onboarding. Don't ask me anything else."
+  max_turns: 12
+  timeout_seconds: 300
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: lens-file, type: file_exists, path: ".petty-thief/lenses/*.md", exists: true }
+  - name: lens-shape
+    type: llm
+    focus: trace
+    criteria: "Look at the Write tool call that created a file in .petty-thief/lenses/. PASS if that file has front matter with name, kind lens, for, and keywords including ux and onboarding, a 'Look at' list covering onboarding steps, friction and microcopy, and verdict extras with top 3 fixes, and the agent asked at most 4 questions (here: none, as told). FAIL otherwise."

@@ -1,0 +1,23 @@
+# Petty Thief profile. Copied to ~/.petty-thief/profile.yaml (or ./.petty-thief/profile.yaml) on first run.
+language: en              # language of analysis files and chat summaries
+save_dir: ~/Petty Thief   # where analyses go; a project folder works too
+default_lens: auto        # creator | dev | ai | learn | design | a collection | auto | the name of your own lens
+default_depth: quick      # quick | deep
+about: >                  # who you are and who you make things for; one concrete example helps
+  Designer making short videos about building products with AI agents, for indie makers.
+goals:                    # verdict sections, in this order
+  - { key: post, label: "For my content" }
+  - { key: process, label: "For my workflow" }
+avoid: []                 # topics never to suggest, for example [politics]
+use: [creator, dev, ai, learn, design, watchlist, recipes, reading]   # lenses and collections that routing may pick
+routes: {}                # domain → lens, wins over built-in routes, e.g. { dribbble.com: design, myanimelist.net: watchlist }
+batch_size: 5            # links per run, then ask to continue; 0 = no limit
+remind: true              # session-start reminder about waiting links; false = stay quiet in this project
+# stash_tag: brand        # this project's name for the bot: links sent with *brand in the note come here
+take_untagged: true       # with stash_tag: also take links sent without a *tag; false = only *brand links
+pages: ask                # claude.ai page per collection (checkboxes for checklists, photo cards for libraries): ask | always | off
+analyzer: built-in        # or the name of another skill that analyzes links your way
+tools:                    # all off by default; you are still asked for every item
+  logged_in_browser: false
+  download_video: false
+  transcribe: false

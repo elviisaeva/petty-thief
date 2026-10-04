@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: onboarding
+description: Without a profile, asks at most 5 onboarding questions before analyzing.
+runs: 2
+execution:
+  prompt: "http://127.0.0.1:8790/fixtures/text-post.html"
+  max_turns: 8
+  timeout_seconds: 300
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: no-analysis-yet, type: file_exists, path: "loot/20*-*.md", exists: false }
+  - name: asks-onboarding
+    type: llm
+    focus: last_message
+    criteria: "PASS if the reply asks the user setup questions (what they want from links, who they are, verdict sections, language and folder, deep tools), at most 5 questions, with defaults. FAIL if it asks more than 5 or skips onboarding."

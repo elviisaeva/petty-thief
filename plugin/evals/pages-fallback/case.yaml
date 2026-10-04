@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: pages-fallback
+description: Without artifact tools, a collection add still works and says why there is no page.
+runs: 2
+execution:
+  prompt: "#recipes http://127.0.0.1:8790/fixtures/recipe.html — and make me a page for my recipes."
+  max_turns: 20
+  timeout_seconds: 500
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: list-still-written, type: file_exists, path: "loot/recipes/_list.md", exists: true }
+  - name: explains
+    type: llm
+    focus: last_message
+    criteria: "PASS if the reply says a page could not be created here (the page tools aren't available or Claude Code isn't signed in to claude.ai) and points to the local list file. FAIL if it claims a page was created or gives no reason."

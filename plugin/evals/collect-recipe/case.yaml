@@ -1,0 +1,21 @@
+schema_version: "1.1"
+name: collect-recipe
+description: A #recipes note adds a card (no checkbox, no status) without copying the page's prose.
+runs: 2
+execution:
+  prompt: "Go through my Petty Thief stash."
+  max_turns: 25
+  timeout_seconds: 600
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: list-line, type: regex, pattern: '^- \*\*Weeknight miso salmon\*\*', flags: m, match: contains, target: { source: file, path: "loot/recipes/_list.md" } }
+  - { name: no-checkbox, type: regex, pattern: '- \[[ x]\]', match: not_contains, target: { source: file, path: "loot/recipes/_list.md" } }
+  - { name: card, type: file_exists, path: "loot/recipes/20*-*.md", exists: true }
+  - { name: no-story-in-list, type: regex, pattern: 'Osaka', match: not_contains, target: { source: file, path: "loot/recipes/_list.md" } }
+  - { name: image-linked, type: regex, pattern: 'image: "?http://127\.0\.0\.1:8790/fixtures/salmon\.jpg', match: contains, target: trace }
+  - name: card-content
+    type: llm
+    focus: trace
+    criteria: "Look at the Write tool call that created the card in loot/recipes/. PASS if the card has servings 2, about 25 minutes, the 5 ingredients, 3–6 short steps, a link, an image line, no status field and no checkbox, does not mention Osaka or the personal story, and loot/_index.md got a row with kind collection. FAIL if steps are missing, a status or checkbox was added, or page prose was copied."

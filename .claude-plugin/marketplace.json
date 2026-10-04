@@ -1,0 +1,12 @@
+{
+  "name": "petty-thief",
+  "owner": { "name": "Elvira Isaieva", "url": "https://github.com/elviisaeva" },
+  "description": "Petty Thief: a Telegram link stash and a Claude Code skill that studies what you saved.",
+  "plugins": [
+    {
+      "name": "petty-thief",
+      "source": "./plugin",
+      "description": "Stash links from Telegram and let Claude Code steal the ideas, formats and techniques. Never the content."
+    }
+  ]
+}

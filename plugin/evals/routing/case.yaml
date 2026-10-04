@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: routing
+description: Auto routing confirms before adding to a collection.
+runs: 2
+execution:
+  prompt: "Go through my Petty Thief stash."
+  max_turns: 12
+  timeout_seconds: 400
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: nothing-written, type: file_exists, path: "loot/watchlist/_list.md", exists: false }
+  - name: confirms-collection
+    type: llm
+    focus: last_message
+    criteria: "PASS if the reply asks the user to confirm adding Frieren to the watchlist (one short question) before writing it. FAIL if it silently added it or analyzed it as content."

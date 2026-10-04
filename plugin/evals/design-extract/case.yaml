@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: design-extract
+description: Reads palette, font and layout from CSS and tags the source.
+runs: 2
+execution:
+  prompt: "Steal the style of this site: http://127.0.0.1:8790/fixtures/site.html"
+  max_turns: 20
+  timeout_seconds: 600
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: in-design-dir, type: file_exists, path: "loot/design/20*-*.md", exists: true }
+  - name: facts-from-css
+    type: llm
+    focus: trace
+    criteria: "Look at the Write tool call that created the file in loot/design/. PASS if it lists #1D4ED8, #0F172A and #F8FAFC tagged from CSS, the font Inter tagged from CSS, a 1200px container, 12 columns, a 24px gap and a 16px radius, and the agent never read page.html or a CSS file whole (only grep output). FAIL if any is missing or if it lists a hex value that is not in the page."

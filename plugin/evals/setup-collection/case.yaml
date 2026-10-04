@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: setup-collection
+description: Creates a custom collection file and enables it in the profile.
+runs: 2
+execution:
+  prompt: "Set up a collection for board games. Statuses want, own, played; done is played. Capture players, play time and why I saved it. Send links from boardgamegeek.com there. Don't ask me anything else."
+  max_turns: 12
+  timeout_seconds: 300
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: collection-file, type: file_exists, path: ".petty-thief/lenses/*.md", exists: true }
+  - { name: kind-collection, type: regex, pattern: 'kind: collection', match: contains, target: trace }
+  - { name: route-added, type: regex, pattern: 'boardgamegeek\.com', match: contains, target: { source: file, path: ".petty-thief/profile.yaml" } }
+  - name: shape
+    type: llm
+    focus: trace
+    criteria: "Look at the Write tool call that created a file in .petty-thief/lenses/ and the edit to .petty-thief/profile.yaml. PASS if the file is a board-games collection with view checklist, statuses [want, own, played], done_status played, card lines for players, play time and why saved, and the profile's use list now includes it. FAIL otherwise."

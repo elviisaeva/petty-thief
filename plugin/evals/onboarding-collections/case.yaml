@@ -1,0 +1,16 @@
+schema_version: "1.1"
+name: onboarding-collections
+description: Collection-only users get at most 3 setup questions.
+runs: 2
+execution:
+  prompt: "I only want to keep recipes and things to watch. http://127.0.0.1:8790/fixtures/recipe.html"
+  max_turns: 8
+  timeout_seconds: 300
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - name: short-onboarding
+    type: llm
+    focus: last_message
+    criteria: "PASS if the reply either asks at most 3 setup questions with none about who they are, verdict sections or deep tools, or sets up the profile from what was said and adds the recipe. FAIL if it asks about verdict sections or deep tools, or asks more than 3 questions."

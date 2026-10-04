@@ -1,0 +1,19 @@
+{
+  "name": "petty-thief",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:dev": "wrangler d1 migrations apply DB --remote --config wrangler.local.jsonc && wrangler deploy --config wrangler.local.jsonc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@cloudflare/workers-types": "^5.20261003.1",
+    "typescript": "~5.8",
+    "vitest": "~3.2",
+    "wrangler": "^4.147.0"
+  }
+}

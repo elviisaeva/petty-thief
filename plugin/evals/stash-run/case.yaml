@@ -1,0 +1,24 @@
+schema_version: "1.1"
+name: stash-run
+description: Goes through two waiting links, saves analyses, updates the index, closes the items.
+runs: 2
+execution:
+  prompt: "Go through my Petty Thief stash."
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: skill-fired, type: tool_used, tool: Skill, input_match: 'petty-thief', min: 1, arm: with-only }
+  - { name: index-written, type: file_exists, path: "loot/_index.md", exists: true }
+  - { name: analyses-written, type: file_exists, path: "loot/20*-*.md", exists: true }
+  - { name: closed-item1, type: regex, pattern: 'stash\.sh"? done item1', match: contains, target: trace }
+  - { name: closed-item2, type: regex, pattern: 'stash\.sh"? done item2', match: contains, target: trace }
+  - name: lenses-and-seen
+    type: llm
+    focus: trace
+    criteria: >
+      Look at the Write tool calls in the trace. PASS if two analysis files were written in loot/, each with a "Seen:" line right under the title.
+      The article one uses lens learn (or another justified lens), and the repo one uses lens dev with an Adopt / Try / Skip rating.
+      loot/_index.md got two rows. FAIL otherwise.

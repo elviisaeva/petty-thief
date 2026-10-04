@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: mark-watched
+description: Checks off an item and updates its card; writes no analysis.
+runs: 2
+execution:
+  prompt: "Mark Frieren as watched."
+  max_turns: 10
+  timeout_seconds: 300
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: checked, type: regex, pattern: '- \[x\] \*\*Frieren', match: contains, target: { source: file, path: "loot/watchlist/_list.md" } }
+  - { name: other-untouched, type: regex, pattern: '- \[ \] \*\*Dandadan', match: contains, target: { source: file, path: "loot/watchlist/_list.md" } }
+  - { name: card-status, type: regex, pattern: 'status: watched', match: contains, target: { source: file, path: "loot/watchlist/2026-10-01-frieren.md" } }
+  - { name: no-new-files, type: file_exists, path: "loot/20*-*.md", exists: false }
+  - { name: no-fetching, type: tool_used, tool: WebFetch, min: 0, max: 0, arm: both }

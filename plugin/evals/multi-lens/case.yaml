@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: multi-lens
+description: Two lenses share one gathering and one file with a section each.
+runs: 2
+execution:
+  prompt: "lens:design,dev http://127.0.0.1:8790/fixtures/site.html"
+  max_turns: 25
+  timeout_seconds: 700
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill, WebFetch, Bash]
+context:
+  scaffold_script: "scaffold.sh"
+graders:
+  - { name: fetched-once, type: tool_used, tool: Bash, input_match: 'curl[^"]*fixtures/site\.html', min: 1, max: 2 }
+  - { name: shared-file-in-save-dir, type: file_exists, path: "loot/20*-*.md", exists: true }
+  - { name: not-in-design-dir, type: file_exists, path: "loot/design/*.md", exists: false }
+  - name: one-file-two-sections
+    type: llm
+    focus: trace
+    criteria: "Look at the Write tool calls. PASS if exactly one analysis file was written for the link, directly in loot/ (not loot/design/, because a non-design lens is included), its header says lens design+dev (or dev+design), it has a '## Lens: design' and a '## Lens: dev' section, and loot/_index.md got one row listing both lenses. FAIL otherwise."
