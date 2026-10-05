@@ -4,6 +4,7 @@ import { countByStatus, countWaitingByTag, getSetting, hitRateLimit, listItems, 
 import { TAG_NAME_RE } from "./urls";
 import { ensureSchema } from "./schema";
 import { registerWebhook } from "./setup";
+import { clearChat } from "./chat";
 import type { TgClient } from "./telegram";
 
 export const API_PER_MINUTE = 60;
@@ -74,6 +75,13 @@ export async function handleApi(req: Request, env: Env, now = Date.now(), tg?: T
     if (!(await getSetting(env.DB, "owner_id"))) return json(409, { error: "finish /setup first" });
     const hook = await registerWebhook(env, tg, url.origin, false);
     return json(hook?.ok ? 200 : 502, { ok: Boolean(hook?.ok), telegram: String(hook?.description ?? "no answer").slice(0, 200) });
+  }
+
+  // Clears the owner's chat on request from Claude Code ("clear my Petty Thief chat"). The stash stays.
+  if (req.method === "POST" && path === "/api/chat/clear" && tg) {
+    const owner = await getSetting(env.DB, "owner_id");
+    if (!owner) return json(409, { error: "finish /setup first" });
+    return json(200, { cleared: await clearChat(env.DB, tg, Number(owner), now) });
   }
 
   // The skill sends a project's lens and collection names, for the bot's lens buttons.

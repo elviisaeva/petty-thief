@@ -30,6 +30,8 @@ export const SCHEMA: string[] = [
   "CREATE TABLE IF NOT EXISTS rate_limits (bucket TEXT PRIMARY KEY, n INTEGER NOT NULL)",
   // One row per Claude Code project, sent by the skill: its tag ('' for a project without one)
   // and its lens and collection names (JSON array), for the bot's lens buttons.
+  // Recent message ids in the owner's chat, so /clear can delete them (Telegram allows 48 hours).
+  "CREATE TABLE IF NOT EXISTS chat_messages (message_id INTEGER PRIMARY KEY, sent_at INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS projects (tag TEXT PRIMARY KEY, lenses TEXT NOT NULL, updated_at INTEGER NOT NULL)",
 ];
 

@@ -3,6 +3,7 @@ import { newApiToken, safeEqual, sha256Hex } from "./auth";
 import * as db from "./db";
 import { applyBranding } from "./branding";
 import { detectSource, extractLinks, extractTag, type Entity } from "./urls";
+import { CLEAR_PROMPT, clearChat, clearKeyboard, rememberMessage } from "./chat";
 import { handleCallback, lensKeyboard, lensesFor, stashedText, type Keyboard, type TgCallbackQuery } from "./picker";
 
 export interface TgClient {
@@ -43,9 +44,10 @@ export const HELP = `Forward or paste any link here and I'll stash it for Claude
 Tap a lens under my reply to steer the analysis (up to 3), or 🎞 for frame by frame. Or type a note next to the link, for example "deep" or "lens:dev".
 Add *project to send a link to one project, e.g. *brand
 
-/list – what's waiting in your stash
-/done – recently analyzed links
+/list – what's waiting, by project (/list brand for one project)
+/done – recently analyzed links, by project
 /undo – remove the last link
+/clear – clear this chat; your stash stays
 /connect – connect Claude Code (new key)
 /rotate – key leaked? Get a new one (same as /connect)
 /forget – delete everything
@@ -97,8 +99,10 @@ async function claim(env: Env, fromId: number, code: string, reply: Reply, origi
 }
 
 export async function handleUpdate(env: Env, update: TgUpdate, tg: TgClient, origin: string, now = Date.now()): Promise<void> {
-  if (update.callback_query) {
-    await handleCallback(env, update.callback_query, tg, now);
+  const cq = update.callback_query;
+  if (cq) {
+    if (cq.data === "c:yes" || cq.data === "c:no") await handleClearTap(env, cq, tg, now);
+    else await handleCallback(env, cq, tg, now);
     return;
   }
   const msg = update.message;
@@ -106,8 +110,12 @@ export async function handleUpdate(env: Env, update: TgUpdate, tg: TgClient, ori
   const text = msg.text ?? msg.caption;
   if (text === undefined) return;
   const entities = msg.entities ?? msg.caption_entities;
-  const reply: Reply = (t, keyboard) =>
-    tg.call("sendMessage", { chat_id: msg.chat.id, text: t, link_preview_options: { is_disabled: true }, ...(keyboard ? { reply_markup: keyboard } : {}) });
+  const reply: Reply = async (t, keyboard) => {
+    const r = await tg.call("sendMessage", { chat_id: msg.chat.id, text: t, link_preview_options: { is_disabled: true }, ...(keyboard ? { reply_markup: keyboard } : {}) });
+    // Only the owner's chat is remembered for /clear.
+    if (msg.from && (await db.getSetting(env.DB, "owner_id")) === String(msg.from.id)) await rememberMessage(env.DB, r?.result?.message_id, now);
+    return r;
+  };
   const cmd = text.trim().match(/^\/([a-z]+)(?:@\w+)?(?:\s+([\s\S]*))?$/i);
 
   const owner = await db.getSetting(env.DB, "owner_id");
@@ -119,6 +127,7 @@ export async function handleUpdate(env: Env, update: TgUpdate, tg: TgClient, ori
     return;
   }
   if (owner !== String(msg.from.id)) return;
+  await rememberMessage(env.DB, msg.message_id, now);
 
   if (cmd) {
     await runCommand(env, cmd[1].toLowerCase(), (cmd[2] ?? "").trim(), reply, origin, tg);
@@ -134,12 +143,13 @@ async function runCommand(env: Env, name: string, arg: string, reply: Reply, ori
   } else if (name === "help") {
     await reply(HELP);
   } else if (name === "list") {
-    const items = await db.listItems(d, "waiting", 10, true);
-    const n = await db.countByStatus(d, "waiting");
-    await reply(items.length ? `${n} waiting:\n${items.map((i) => `• ${i.url}${i.tag ? ` *${i.tag}` : ""}${i.note ? ` — ${i.note}` : ""}`).join("\n")}` : "Your stash is empty.");
+    await reply(await listText(d, arg));
   } else if (name === "done") {
-    const items = await db.listItems(d, "done", 10, true);
-    await reply(items.length ? `Recently analyzed:\n${items.map((i) => `• ${i.summary ?? "(no summary)"}\n  ${i.url}`).join("\n")}` : "Nothing analyzed yet.");
+    const items = await db.listItems(d, "done", 15, true);
+    const groups = groupByTag(items).map(([tag, list]) => `${projectName(tag)}\n${list.map((i) => `• ${i.summary ?? "(no summary)"}\n  ${i.url}`).join("\n")}`);
+    await reply(items.length ? `Recently analyzed:\n\n${groups.join("\n\n")}` : "Nothing analyzed yet.");
+  } else if (name === "clear") {
+    await reply(CLEAR_PROMPT, clearKeyboard);
   } else if (name === "undo") {
     const item = await db.undoLast(d);
     await reply(item ? `Removed: ${item.url}` : "Nothing to undo.");
@@ -198,4 +208,59 @@ async function stash(env: Env, msg: TgMessage, text: string, entities: Entity[] 
   const waiting = await db.countByStatus(env.DB, "waiting");
   const keyboard = lensKeyboard(msg.message_id, await lensesFor(env.DB, tag, now), { lenses: [], deep: false }, tag);
   await reply(stashedText(tag, waiting, extras), keyboard);
+}
+
+const projectName = (tag: string | null) => (tag ? `*${tag}` : "no project");
+const LIST_PER_PROJECT = 5;
+
+/** Groups items by tag, keeping the order in which each tag first appears. */
+function groupByTag(items: db.Item[]): [string | null, db.Item[]][] {
+  const groups = new Map<string | null, db.Item[]>();
+  for (const i of items) groups.set(i.tag, [...(groups.get(i.tag) ?? []), i]);
+  return [...groups.entries()];
+}
+
+const line = (i: db.Item) => `• ${i.url}${i.note ? ` — ${i.note}` : ""}`;
+
+/** "/list": waiting links per project, newest first. "/list brand": only that project's. */
+async function listText(d: D1Database, arg: string): Promise<string> {
+  const name = arg.replace(/^\*/, "").toLowerCase();
+  if (name) {
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/.test(name)) return "Send /list or /list <project>, for example /list brand.";
+    const items = await db.listItems(d, "waiting", 20, true, { tag: name, untagged: false });
+    const n = await db.countByStatus(d, "waiting", { tag: name, untagged: false });
+    return items.length ? `*${name} · ${n} waiting:\n${items.map(line).join("\n")}` : `Nothing waiting for *${name}.`;
+  }
+  const total = await db.countByStatus(d, "waiting");
+  if (total === 0) return "Your stash is empty.";
+  const counts: [string | null, number][] = Object.entries(await db.countWaitingByTag(d));
+  const untagged = await db.countByStatus(d, "waiting", { untaggedOnly: true });
+  if (untagged) counts.push([null, untagged]);
+  const items = await db.listItems(d, "waiting", 50, true);
+  const byTag = new Map(groupByTag(items));
+  const sections = counts
+    .sort((a, b) => b[1] - a[1])
+    .map(([tag, n]) => {
+      const list = (byTag.get(tag) ?? []).slice(0, LIST_PER_PROJECT);
+      const more = n - list.length;
+      const hint = more > 0 ? `\n  …and ${more} more${tag ? `: /list ${tag}` : ""}` : "";
+      return `${projectName(tag)} · ${n}\n${list.map(line).join("\n")}${hint}`;
+    });
+  return `${total} waiting\n\n${sections.join("\n\n")}`;
+}
+
+async function handleClearTap(env: Env, cq: TgCallbackQuery, tg: TgClient, now: number): Promise<void> {
+  const answer = (text?: string) => tg.call("answerCallbackQuery", { callback_query_id: cq.id, ...(text ? { text } : {}) });
+  const owner = await db.getSetting(env.DB, "owner_id");
+  if (!owner || owner !== String(cq.from.id) || !cq.message) {
+    await answer();
+    return;
+  }
+  if (cq.data === "c:no") {
+    await tg.call("deleteMessage", { chat_id: cq.message.chat.id, message_id: cq.message.message_id });
+    await answer("Kept.");
+    return;
+  }
+  const n = await clearChat(env.DB, tg, cq.message.chat.id, now);
+  await answer(`Cleared ${n} messages. Your stash is untouched.`);
 }

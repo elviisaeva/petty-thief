@@ -49,6 +49,8 @@ Never edit files inside this skill folder for one user's preferences. Personal s
 | "Mark X as <status>" | Follow `reference/collections.md` → Status changes. |
 | "What's on my <collection>?", "what should I cook tonight?" | For a checklist with a page, pull statuses first (`reference/pages.md` → Pull). Then follow `reference/collections.md` → Queries. Answer in chat. |
 | "Make a page for my <collection>", "where's my watchlist page?" | Follow `reference/pages.md`. |
+| "Clear my Telegram chat", "clean up the bot chat" | Run `sh "<skill base dir>/scripts/stash.sh" clear-chat` and report its line. It deletes the last 48 hours of chat (Telegram's limit); the stash is untouched. Older messages: Clear history in the Telegram chat menu. |
+| "The bot is silent", "the buttons don't react", "re-register the bot" | Run `sh "<skill base dir>/scripts/stash.sh" webhook` and report Telegram's answer. |
 | Asks to change how analyses look | Edit the profile, or create or edit a custom lens. Suggest which of the two fits. |
 
 ## Connecting

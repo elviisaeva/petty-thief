@@ -138,16 +138,24 @@ describe("commands", () => {
     await db.addItem(env.DB, { url: "https://a.com/2", note: null, source: "other" }, 2);
     const tg = fakeTg();
     await handleUpdate(env, msg("/list"), tg.client, ORIGIN, NOW);
-    expect(tg.sent()).toEqual(["2 waiting:\n• https://a.com/2\n• https://a.com/1 — hook"]);
+    expect(tg.sent()).toEqual(["2 waiting\n\nno project · 2\n• https://a.com/2\n• https://a.com/1 — hook"]);
   });
 
-  it("/list shows the tag next to tagged links", async () => {
-    await db.addItem(env.DB, { url: "https://a.com/1", note: "hook", tag: "brand", source: "other" }, 1);
-    await db.addItem(env.DB, { url: "https://a.com/2", note: null, tag: "home", source: "other" }, 2);
-    await db.addItem(env.DB, { url: "https://a.com/3", note: null, source: "other" }, 3);
+  it("/list groups waiting links by project, biggest first, 5 per project", async () => {
+    for (let i = 1; i <= 7; i++) await db.addItem(env.DB, { url: `https://b.com/${i}`, note: null, tag: "brand", source: "other" }, i);
+    await db.addItem(env.DB, { url: "https://a.com/2", note: null, tag: "home", source: "other" }, 20);
+    await db.addItem(env.DB, { url: "https://a.com/3", note: "why", source: "other" }, 30);
     const tg = fakeTg();
     await handleUpdate(env, msg("/list"), tg.client, ORIGIN, NOW);
-    expect(tg.sent()).toEqual(["3 waiting:\n• https://a.com/3\n• https://a.com/2 *home\n• https://a.com/1 *brand — hook"]);
+    expect(tg.sent()[0]).toBe(
+      "9 waiting\n\n*brand · 7\n• https://b.com/7\n• https://b.com/6\n• https://b.com/5\n• https://b.com/4\n• https://b.com/3\n  …and 2 more: /list brand" +
+        "\n\n*home · 1\n• https://a.com/2\n\nno project · 1\n• https://a.com/3 — why",
+    );
+    await handleUpdate(env, msg("/list *Brand"), tg.client, ORIGIN, NOW);
+    expect(tg.sent()[1].split("\n")[0]).toBe("*brand · 7 waiting:");
+    await handleUpdate(env, msg("/list nowhere"), tg.client, ORIGIN, NOW);
+    await handleUpdate(env, msg("/list bad name!"), tg.client, ORIGIN, NOW);
+    expect(tg.sent().slice(2)).toEqual(["Nothing waiting for *nowhere.", "Send /list or /list <project>, for example /list brand."]);
   });
 
   it("/help explains project tags", async () => {
@@ -167,7 +175,7 @@ describe("commands", () => {
     await db.markDone(env.DB, r.item.id, { lens: "creator", summary: "Hook lands in 0.5 s", file: "a.md" }, 5);
     const tg = fakeTg();
     await handleUpdate(env, msg("/done"), tg.client, ORIGIN, NOW);
-    expect(tg.sent()).toEqual(["Recently analyzed:\n• Hook lands in 0.5 s\n  https://a.com/1"]);
+    expect(tg.sent()).toEqual(["Recently analyzed:\n\nno project\n• Hook lands in 0.5 s\n  https://a.com/1"]);
   });
 
   it("/undo removes the newest waiting link", async () => {
@@ -208,5 +216,50 @@ describe("commands", () => {
     await handleUpdate(env, msg("/dance"), tg.client, ORIGIN, NOW);
     await handleUpdate(env, msg("/claim ABC123"), tg.client, ORIGIN, NOW);
     expect(tg.sent()).toEqual(["Unknown command. Send /help to see what I can do.", "This bot already has an owner."]);
+  });
+});
+
+describe("/done by project and /clear", () => {
+  beforeEach(() => seedOwner(env.DB));
+
+  it("/done groups analyzed links by project", async () => {
+    for (const [url, tag, s] of [["https://a.com/1", "brand", "One"], ["https://a.com/2", null, "Two"], ["https://a.com/3", "brand", "Three"]] as const) {
+      const r = await db.addItem(env.DB, { url, note: null, tag, source: "other" }, 1);
+      if (r.added) await db.markDone(env.DB, r.item.id, { lens: "creator", summary: s, file: null }, url.endsWith("1") ? 5 : url.endsWith("2") ? 6 : 7);
+    }
+    const tg = fakeTg();
+    await handleUpdate(env, msg("/done"), tg.client, ORIGIN, NOW);
+    expect(tg.sent()[0]).toBe("Recently analyzed:\n\n*brand\n• Three\n  https://a.com/3\n• One\n  https://a.com/1\n\nno project\n• Two\n  https://a.com/2");
+  });
+
+  it("/clear asks first, then deletes the last 48 hours of chat and keeps the stash", async () => {
+    let nextBotMsg = 5000;
+    const tg = fakeTg();
+    const client = { async call(method: string, body: Record<string, any>) {
+      const r = await tg.client.call(method, body);
+      return method === "sendMessage" ? { ok: true, result: { message_id: nextBotMsg++ } } : r;
+    } };
+    const old = msg("https://a.com/old");
+    await handleUpdate(env, old, client, ORIGIN, NOW - 49 * 3600_000);
+    const link = msg("https://a.com/1");
+    await handleUpdate(env, link, client, ORIGIN, NOW);
+    await handleUpdate(env, msg("/clear"), client, ORIGIN, NOW);
+    expect(tg.sent().at(-1)).toContain("Your stash stays");
+    const cq = (data: string) => ({ update_id: 1, callback_query: { id: "c1", from: { id: OWNER }, data, message: { message_id: 5002, chat: { id: OWNER } } } });
+    await handleUpdate(env, cq("c:yes"), client, ORIGIN, NOW + 1000);
+    const del = tg.calls.find((c) => c.method === "deleteMessages")!;
+    expect(del.body.chat_id).toBe(OWNER);
+    expect(del.body.message_ids).not.toContain(old.message!.message_id);
+    expect(del.body.message_ids).toEqual(expect.arrayContaining([link.message!.message_id, 5001, 5002]));
+    expect(tg.calls.filter((c) => c.method === "answerCallbackQuery").at(-1)!.body.text).toMatch(/^Cleared \d+ messages/);
+    expect(await db.countByStatus(env.DB, "waiting")).toBe(2);
+  });
+
+  it("ignores /clear taps from strangers; Cancel deletes only the prompt", async () => {
+    const tg = fakeTg();
+    const cq = (data: string, from: number) => ({ update_id: 1, callback_query: { id: "c", from: { id: from }, data, message: { message_id: 77, chat: { id: from } } } });
+    await handleUpdate(env, cq("c:yes", 7), tg.client, ORIGIN, NOW);
+    await handleUpdate(env, cq("c:no", OWNER), tg.client, ORIGIN, NOW);
+    expect(tg.calls.map((c) => c.method)).toEqual(["answerCallbackQuery", "deleteMessage", "answerCallbackQuery"]);
   });
 });

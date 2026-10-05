@@ -4,6 +4,8 @@ import { getSetting } from "./db";
 import { ensureSchema } from "./schema";
 import { handleUpdate, type TgClient, type TgUpdate } from "./telegram";
 import { upgradeWebhook } from "./setup";
+import { BRANDING_VERSION, applyBranding } from "./branding";
+import { claimOnce, setSetting } from "./db";
 
 export async function handleWebhook(req: Request, env: Env, tg: TgClient, now = Date.now()): Promise<Response> {
   await ensureSchema(env.DB);
@@ -31,6 +33,15 @@ export async function handleWebhook(req: Request, env: Env, tg: TgClient, now = 
     await upgradeWebhook(env, tg, new URL(req.url).origin, now);
   } catch (e) {
     console.error("webhook upgrade failed:", e instanceof Error ? e.message : "unknown error");
+  }
+  // New commands reach the bot's menu without a /connect: once per branding version.
+  try {
+    if ((await getSetting(env.DB, "branding_version")) !== BRANDING_VERSION && (await claimOnce(env.DB, "branding_at", now, 10 * 60 * 1000))) {
+      await applyBranding(tg);
+      await setSetting(env.DB, "branding_version", BRANDING_VERSION);
+    }
+  } catch (e) {
+    console.error("branding failed:", e instanceof Error ? e.message : "unknown error");
   }
   return new Response("ok");
 }

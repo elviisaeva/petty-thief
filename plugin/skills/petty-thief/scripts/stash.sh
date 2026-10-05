@@ -6,6 +6,7 @@
 #   stash.sh count                                     (only this project's links, see below)
 #   stash.sh list [waiting|done|skipped] [limit] [tag] (limit 1-200, default 20; same filter)
 #   stash.sh tags                                      (waiting links per tag: "<tag> <n>" lines)
+#   stash.sh clear-chat                                (delete the last 48 h of the Telegram chat; the stash stays)
 #   stash.sh webhook                                   (re-register the bot with Telegram: fixes a silent bot or dead buttons)
 # count and list follow stash_tag and take_untagged from ./.petty-thief/profile.yaml, else
 # ~/.petty-thief/profile.yaml: with stash_tag, the links tagged for it (plus untagged ones unless
@@ -96,6 +97,11 @@ case "$cmd" in
     printf '%s\n' "$out" | sed -n 's/.*"tagged":{\([^}]*\)}.*/\1/p' | tr ',' '\n' |
       sed -n 's/^"\([a-z0-9][a-z0-9-]*\)":\([0-9][0-9]*\)$/\1 \2/p'
     ;;
+  clear-chat)
+    need_config
+    out=$(pt_curl 30 -X POST "$PT_URL/api/chat/clear") || die "could not clear the chat"
+    printf '%s\n' "$out" | sed -n 's/.*"cleared":\([0-9][0-9]*\).*/Cleared \1 messages. The stash is untouched./p'
+    ;;
   webhook)
     need_config
     out=$(pt_curl 20 -X POST "$PT_URL/api/webhook") || die "the bot could not re-register with Telegram"
@@ -116,6 +122,6 @@ case "$cmd" in
     pt_curl 15 -X POST -H 'content-type: application/json' --data-binary "$body" "$PT_URL/api/items/$1/skip" || die "could not skip $1"
     ;;
   *)
-    die "usage: stash.sh connect|host|count|list|tags|webhook|done|skip (see the top of this file)"
+    die "usage: stash.sh connect|host|count|list|tags|clear-chat|webhook|done|skip (see the top of this file)"
     ;;
 esac

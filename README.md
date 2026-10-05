@@ -90,6 +90,8 @@ Each collection can get a private claude.ai page you open on your phone: checkbo
 
 **Pick a lens with a tap.** Under every "✓ stashed" the bot shows buttons: your lenses and collections (up to 3 per link), 🎞 frame by frame, and 📁 the project. Leave it on auto and Petty Thief picks by itself. The buttons follow your profile: each time Claude Code starts in a project, it sends the bot that project's lens names (names only), so a new lens or project shows up after the next start.
 
+`/list` and `/done` group links by project (`/list brand` shows one project). `/clear` cleans up the chat: your stash stays, and Claude Code can do it for you too ("clear my Petty Thief chat"). Telegram lets a bot delete only the last 48 hours; for older messages use Clear history in the chat menu.
+
 If the bot stops answering or the buttons don't react, ask Claude Code to run `stash.sh webhook` ("re-register my Petty Thief bot"): it re-registers the bot with Telegram using your key.
 
 Or steer it with a note next to the link: `lens:dev`, `#recipes`, `lens:design,dev`, `deep`, or plain words like "how did they edit this".
