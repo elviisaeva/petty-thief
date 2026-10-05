@@ -459,3 +459,43 @@ test("session-start stays silent on a malformed stash_tag and makes no request",
   assert.deepEqual([r.code, r.stdout], [0, ""]);
   assert.equal(s.requests.length, 0);
 });
+
+// Lens buttons: session-start sends the project's `use` names to the bot, in the background.
+const waitFor = async (pred, ms = 3000) => {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { if (pred()) return true; await new Promise((r) => setTimeout(r, 50)); }
+  return pred();
+};
+const puts = (s) => s.requests.filter((r) => r.method === "PUT");
+
+test("session-start sends the project's lenses to the bot once, and again when they change", async (t) => {
+  const s = await server(okJson({ waiting: 0, ok: true }));
+  t.after(() => s.close());
+  const f = configFile(s.url);
+  const d = dirs({ project: "stash_tag: brand\nuse: [creator, Design, design, \"watchlist\", bad name]  # mine\n" });
+  await run("session-start.sh", [], f, "", d);
+  assert.ok(await waitFor(() => puts(s).length === 1));
+  assert.deepEqual([puts(s)[0].url, puts(s)[0].body], ["/api/projects/brand", '{"lenses":["creator","design","watchlist"]}']);
+  await run("session-start.sh", [], f, "", d);
+  await new Promise((r) => setTimeout(r, 400));
+  assert.equal(puts(s).length, 1, "unchanged names are not sent again");
+  writeFileSync(path.join(d.cwd, ".petty-thief", "profile.yaml"), "stash_tag: brand\nuse:\n  - creator\n  - recipes\n");
+  await run("session-start.sh", [], f, "", d);
+  assert.ok(await waitFor(() => puts(s).length === 2));
+  assert.equal(puts(s)[1].body, '{"lenses":["creator","recipes"]}');
+  s.close();
+});
+
+test("session-start syncs a project without a tag as -, even with remind: false, and skips without use", async (t) => {
+  const s = await server(okJson({ waiting: 0, ok: true }));
+  t.after(() => s.close());
+  const quiet = dirs({ project: "remind: false\nuse: [dev]\n" });
+  const r = await run("session-start.sh", [], configFile(s.url), "", quiet);
+  assert.equal(r.stdout, "");
+  assert.ok(await waitFor(() => puts(s).length === 1));
+  assert.equal(puts(s)[0].url, "/api/projects/-");
+  await run("session-start.sh", [], configFile(s.url), "", dirs({ project: "language: en\n" }));
+  await new Promise((r2) => setTimeout(r2, 400));
+  assert.equal(puts(s).length, 1);
+  s.close();
+});

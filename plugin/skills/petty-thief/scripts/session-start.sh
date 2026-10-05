@@ -5,6 +5,12 @@ pt_lib="$(dirname "$0")/lib.sh"
 [ -r "$pt_lib" ] || exit 0
 . "$pt_lib" || exit 0
 
+pt_load_config 2>/dev/null || exit 0
+# A bad stash_tag keeps the hook silent; stash.sh explains it.
+pt_tag_filter 2>/dev/null || exit 0
+# The bot's lens buttons follow this project's lenses. Runs even with remind: false.
+pt_sync_project 2>/dev/null
+
 # remind: false (also no/off) in ./.petty-thief/profile.yaml keeps this hook silent.
 # ~/.petty-thief/profile.yaml sets the global default; a remind line in the project file wins.
 pt_remind() {
@@ -15,10 +21,8 @@ remind=$(pt_remind "./.petty-thief/profile.yaml")
 [ -n "$remind" ] || remind=$(pt_remind "$HOME/.petty-thief/profile.yaml")
 case "$remind" in false | no | off) exit 0 ;; esac
 
-pt_load_config 2>/dev/null || exit 0
 # Count only this project's links: its stash_tag ones (plus untagged unless take_untagged is false),
-# or without stash_tag only untagged ones. A bad stash_tag keeps the hook silent; stash.sh explains it.
-pt_tag_filter 2>/dev/null || exit 0
+# or without stash_tag only untagged ones.
 n=$(pt_curl 3 "$PT_URL/api/count?${PT_TAG_QUERY#&}" 2>/dev/null | sed -n 's/.*"waiting":\([0-9][0-9]*\).*/\1/p')
 [ -n "$n" ] || exit 0
 

@@ -39,7 +39,8 @@ describe("setup", () => {
 
     const hook = tg.calls.find((c) => c.method === "setWebhook")!.body;
     expect(hook.url).toBe(`${ORIGIN}/telegram`);
-    expect(hook.allowed_updates).toEqual(["message"]);
+    expect(hook.allowed_updates).toEqual(["message", "callback_query"]);
+    expect(await db.getSetting(env.DB, "webhook_updates")).toBe("message,callback_query");
     expect(tg.calls.some((c) => c.method === "setMyCommands")).toBe(true);
     expect(await db.getSetting(env.DB, "webhook_secret_hash")).toBe(await sha256Hex(hook.secret_token));
 

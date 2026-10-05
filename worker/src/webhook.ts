@@ -3,6 +3,7 @@ import { safeEqual, sha256Hex } from "./auth";
 import { getSetting } from "./db";
 import { ensureSchema } from "./schema";
 import { handleUpdate, type TgClient, type TgUpdate } from "./telegram";
+import { upgradeWebhook } from "./setup";
 
 export async function handleWebhook(req: Request, env: Env, tg: TgClient, now = Date.now()): Promise<Response> {
   await ensureSchema(env.DB);
@@ -24,6 +25,12 @@ export async function handleWebhook(req: Request, env: Env, tg: TgClient, now = 
     await handleUpdate(env, update, tg, new URL(req.url).origin, now);
   } catch (e) {
     console.error("update failed:", e instanceof Error ? e.message : "unknown error");
+  }
+  // After the update, so it is handled with the secret it arrived with.
+  try {
+    await upgradeWebhook(env, tg, new URL(req.url).origin, now);
+  } catch (e) {
+    console.error("webhook upgrade failed:", e instanceof Error ? e.message : "unknown error");
   }
   return new Response("ok");
 }

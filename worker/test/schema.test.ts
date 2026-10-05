@@ -85,6 +85,6 @@ describe("schema", () => {
 
   it("uses IF NOT EXISTS in every statement", () => {
     for (const s of SCHEMA) expect(s).toMatch(/^CREATE (UNIQUE )?(TABLE|INDEX) IF NOT EXISTS /);
-    for (const c of ADDED_COLUMNS) expect(c.sql).toBe(`ALTER TABLE items ADD COLUMN ${c.name} TEXT`);
+    for (const c of ADDED_COLUMNS) expect(c.sql).toMatch(new RegExp(`^ALTER TABLE items ADD COLUMN ${c.name} (TEXT|INTEGER NOT NULL DEFAULT 0)$`));
   });
 });

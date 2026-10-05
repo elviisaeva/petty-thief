@@ -88,7 +88,9 @@ Collections work differently: they give you a short card (facts plus the link, n
 
 Each collection can get a private claude.ai page you open on your phone: checkboxes for checklists, a photo grid for recipes. Make your own collection ("set up a collection for board games") or lens ("make a lens for UX research"); Claude asks at most 4 questions.
 
-Steer it with a note next to the link: `lens:dev`, `#recipes`, `lens:design,dev`, `deep`, or plain words like "how did they edit this".
+**Pick a lens with a tap.** Under every "✓ stashed" the bot shows buttons: your lenses and collections (up to 3 per link), 🎞 frame by frame, and 📁 the project. Leave it on auto and Petty Thief picks by itself. The buttons follow your profile: each time Claude Code starts in a project, it sends the bot that project's lens names (names only), so a new lens or project shows up after the next start.
+
+Or steer it with a note next to the link: `lens:dev`, `#recipes`, `lens:design,dev`, `deep`, or plain words like "how did they edit this".
 
 ## Where your loot goes
 

@@ -3,6 +3,7 @@ import { newApiToken, safeEqual, sha256Hex } from "./auth";
 import * as db from "./db";
 import { applyBranding } from "./branding";
 import { detectSource, extractLinks, extractTag, type Entity } from "./urls";
+import { handleCallback, lensKeyboard, lensesFor, stashedText, type Keyboard, type TgCallbackQuery } from "./picker";
 
 export interface TgClient {
   call(method: string, body: Record<string, unknown>): Promise<any>;
@@ -21,10 +22,11 @@ export interface TgMessage {
 export interface TgUpdate {
   update_id: number;
   message?: TgMessage;
+  callback_query?: TgCallbackQuery;
   [k: string]: unknown;
 }
 
-type Reply = (text: string) => Promise<unknown>;
+type Reply = (text: string, keyboard?: Keyboard) => Promise<unknown>;
 
 export const DAILY_CAP = 200;
 
@@ -33,12 +35,12 @@ const CLAIM_KEYS = ["claim_code_hash", "claim_expires", "claim_attempts"];
 
 export const WELCOME = `Hey, petty thief here. 🦝
 Send me anything worth stealing an idea from: a TikTok, a Reel, a repo, an article. Just share it here.
-Add a note next to the link to steer me: "deep" for a frame-by-frame breakdown, "#recipes" to file it, "lens:design" for styles.
+Then tap a lens under my reply, or leave it on auto. You can also type a note next to the link: "deep", "#recipes", "lens:design".
 Next time you open Claude Code, it'll ask if you want to go through your stash.
 /help shows everything I can do.`;
 
 export const HELP = `Forward or paste any link here and I'll stash it for Claude Code.
-Add a note next to the link (for example "deep" or "lens:dev") to steer the analysis.
+Tap a lens under my reply to steer the analysis (up to 3), or 🎞 for frame by frame. Or type a note next to the link, for example "deep" or "lens:dev".
 Add *project to send a link to one project, e.g. *brand
 
 /list – what's waiting in your stash
@@ -95,12 +97,17 @@ async function claim(env: Env, fromId: number, code: string, reply: Reply, origi
 }
 
 export async function handleUpdate(env: Env, update: TgUpdate, tg: TgClient, origin: string, now = Date.now()): Promise<void> {
+  if (update.callback_query) {
+    await handleCallback(env, update.callback_query, tg, now);
+    return;
+  }
   const msg = update.message;
   if (!msg?.from || msg.chat.type !== "private") return;
   const text = msg.text ?? msg.caption;
   if (text === undefined) return;
   const entities = msg.entities ?? msg.caption_entities;
-  const reply: Reply = (t) => tg.call("sendMessage", { chat_id: msg.chat.id, text: t, link_preview_options: { is_disabled: true } });
+  const reply: Reply = (t, keyboard) =>
+    tg.call("sendMessage", { chat_id: msg.chat.id, text: t, link_preview_options: { is_disabled: true }, ...(keyboard ? { reply_markup: keyboard } : {}) });
   const cmd = text.trim().match(/^\/([a-z]+)(?:@\w+)?(?:\s+([\s\S]*))?$/i);
 
   const owner = await db.getSetting(env.DB, "owner_id");
@@ -189,5 +196,6 @@ async function stash(env: Env, msg: TgMessage, text: string, entities: Entity[] 
   }
   const extras = [moved ? `${moved} moved to *${tag}` : "", already ? `${already} already there` : ""].filter(Boolean).join(", ");
   const waiting = await db.countByStatus(env.DB, "waiting");
-  await reply(`✓ stashed${tag ? ` for *${tag}` : ""} · ${waiting} waiting${extras ? ` (${extras})` : ""}`);
+  const keyboard = lensKeyboard(msg.message_id, await lensesFor(env.DB, tag, now), { lenses: [], deep: false }, tag);
+  await reply(stashedText(tag, waiting, extras), keyboard);
 }

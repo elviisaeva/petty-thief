@@ -93,6 +93,7 @@ One bot serves many projects. In Telegram, a note may carry `*name` (for example
 3. **Classify** the link type: video, post, carousel, single image, article, repo or tool, thread, profile. Detect the format with `reference/formats.md`.
 4. **Route to a lens or collection.** The first match wins:
    1. the note says `lens:<name>`, `lens:<a>,<b>` or `#<name>`, but only when `<name>` is an existing lens or collection name (ignore stray hashtags like #fyp);
+      (The bot's lens buttons put the user's taps at the start of the note in these same words, for example `lens:design,creator deep`.)
    2. the note matches the `keywords` of a lens in the profile's `use` (any language);
    3. the URL host matches the profile's `routes` (these win), or a lens file's `routes`;
    4. by link type: GitHub, docs or package pages → `dev`; article → `learn`;

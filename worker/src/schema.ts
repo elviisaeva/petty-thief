@@ -17,7 +17,9 @@ export const SCHEMA: string[] = [
   tg_message_id INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  tag TEXT
+  tag TEXT,
+  pick_lenses TEXT,
+  pick_deep INTEGER NOT NULL DEFAULT 0
 )`,
   "CREATE UNIQUE INDEX IF NOT EXISTS items_waiting_url ON items (url) WHERE status = 'waiting'",
   "CREATE INDEX IF NOT EXISTS items_status_created ON items (status, created_at)",
@@ -26,13 +28,20 @@ export const SCHEMA: string[] = [
   "CREATE INDEX IF NOT EXISTS items_status_tag ON items (status, tag, created_at)",
   "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS rate_limits (bucket TEXT PRIMARY KEY, n INTEGER NOT NULL)",
+  // One row per Claude Code project, sent by the skill: its tag ('' for a project without one)
+  // and its lens and collection names (JSON array), for the bot's lens buttons.
+  "CREATE TABLE IF NOT EXISTS projects (tag TEXT PRIMARY KEY, lenses TEXT NOT NULL, updated_at INTEGER NOT NULL)",
 ];
 
 let ready = false;
 
 // Columns added after 0001_init.sql. SQLite has no ADD COLUMN IF NOT EXISTS, so ensureSchema
 // checks the table first. Each one also sits in the CREATE TABLE above, last, in this order.
-export const ADDED_COLUMNS: { name: string; sql: string }[] = [{ name: "tag", sql: "ALTER TABLE items ADD COLUMN tag TEXT" }];
+export const ADDED_COLUMNS: { name: string; sql: string }[] = [
+  { name: "tag", sql: "ALTER TABLE items ADD COLUMN tag TEXT" },
+  { name: "pick_lenses", sql: "ALTER TABLE items ADD COLUMN pick_lenses TEXT" },
+  { name: "pick_deep", sql: "ALTER TABLE items ADD COLUMN pick_deep INTEGER NOT NULL DEFAULT 0" },
+];
 
 /** Creates any missing table, column or index. Cheap: two queries per isolate, then a no-op. */
 export async function ensureSchema(db: D1Database): Promise<void> {

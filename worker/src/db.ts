@@ -17,6 +17,27 @@ export interface Item {
   updated_at: number;
 }
 
+/** A row as stored: lenses and depth picked with the bot's buttons are kept apart from the note. */
+interface ItemRow extends Item {
+  pick_lenses: string | null;
+  pick_deep: number;
+}
+
+export interface Picks {
+  lenses: string[];
+  deep: boolean;
+}
+
+/**
+ * The note the skill reads: button picks first, in the same words the user could type
+ * ("lens:design,creator deep"), then the user's own note. The pick columns are not returned.
+ */
+function toItem(row: ItemRow): Item {
+  const { pick_lenses, pick_deep, ...item } = row;
+  const parts = [pick_lenses ? `lens:${pick_lenses}` : "", pick_deep ? "deep" : "", item.note ?? ""].filter(Boolean);
+  return { ...item, note: parts.length ? parts.join(" ") : null };
+}
+
 export interface NewItem {
   url: string;
   note: string | null;
@@ -46,10 +67,11 @@ export interface DoneInfo {
   file: string | null;
 }
 
-const ITEM_COLUMNS = "id, url, note, source, status, lens, summary, file, reason, tag, created_at, updated_at";
+const ITEM_COLUMNS = "id, url, note, source, status, lens, summary, file, reason, tag, created_at, updated_at, pick_lenses, pick_deep";
 
 export async function getItem(db: D1Database, id: string): Promise<Item | null> {
-  return db.prepare(`SELECT ${ITEM_COLUMNS} FROM items WHERE id = ?`).bind(id).first<Item>();
+  const row = await db.prepare(`SELECT ${ITEM_COLUMNS} FROM items WHERE id = ?`).bind(id).first<ItemRow>();
+  return row ? toItem(row) : null;
 }
 
 export async function addItem(db: D1Database, input: NewItem, now = Date.now()): Promise<AddResult> {
@@ -118,8 +140,8 @@ export async function listItems(
   const { results } = await db
     .prepare(`SELECT ${ITEM_COLUMNS} FROM items WHERE status = ?${t.sql} ORDER BY ${column} ${dir}, id ${dir} LIMIT ?`)
     .bind(status, ...t.args, limit)
-    .all<Item>();
-  return results;
+    .all<ItemRow>();
+  return results.map(toItem);
 }
 
 export async function markDone(db: D1Database, id: string, info: DoneInfo, now = Date.now()): Promise<boolean> {
@@ -141,10 +163,10 @@ export async function markSkipped(db: D1Database, id: string, reason: string | n
 export async function undoLast(db: D1Database): Promise<Item | null> {
   const last = await db
     .prepare(`SELECT ${ITEM_COLUMNS} FROM items WHERE status = 'waiting' ORDER BY created_at DESC, id DESC LIMIT 1`)
-    .first<Item>();
+    .first<ItemRow>();
   if (!last) return null;
   await db.prepare("DELETE FROM items WHERE id = ?").bind(last.id).run();
-  return last;
+  return toItem(last);
 }
 
 export async function forgetAll(db: D1Database): Promise<number> {
@@ -194,4 +216,58 @@ export async function hitRateLimit(db: D1Database, prefix: string, windowId: num
     await db.prepare("DELETE FROM rate_limits WHERE bucket LIKE ? AND bucket != ?").bind(`${prefix}:%`, bucket).run();
   }
   return n <= max;
+}
+
+/** The waiting links stored from one Telegram message: what a row of buttons acts on. */
+export async function waitingForMessage(db: D1Database, tgMessageId: number): Promise<{ tag: string | null; picks: Picks } | null> {
+  const row = await db
+    .prepare("SELECT tag, pick_lenses, pick_deep FROM items WHERE tg_message_id = ? AND status = 'waiting' LIMIT 1")
+    .bind(tgMessageId)
+    .first<{ tag: string | null; pick_lenses: string | null; pick_deep: number }>();
+  if (!row) return null;
+  return { tag: row.tag, picks: { lenses: row.pick_lenses ? row.pick_lenses.split(",") : [], deep: row.pick_deep === 1 } };
+}
+
+export async function setPicks(db: D1Database, tgMessageId: number, picks: Picks): Promise<void> {
+  await db
+    .prepare("UPDATE items SET pick_lenses = ?, pick_deep = ? WHERE tg_message_id = ? AND status = 'waiting'")
+    .bind(picks.lenses.length ? picks.lenses.join(",") : null, picks.deep ? 1 : 0, tgMessageId)
+    .run();
+}
+
+export async function setTagForMessage(db: D1Database, tgMessageId: number, tag: string | null, now = Date.now()): Promise<void> {
+  await db
+    .prepare("UPDATE items SET tag = ?, updated_at = ? WHERE tg_message_id = ? AND status = 'waiting'")
+    .bind(tag, now, tgMessageId)
+    .run();
+}
+
+/** `tag` is '' for a project without one. */
+export async function setProject(db: D1Database, tag: string, lenses: string[], now = Date.now()): Promise<void> {
+  await db
+    .prepare("INSERT INTO projects (tag, lenses, updated_at) VALUES (?, ?, ?) ON CONFLICT (tag) DO UPDATE SET lenses = excluded.lenses, updated_at = excluded.updated_at")
+    .bind(tag, JSON.stringify(lenses), now)
+    .run();
+}
+
+export interface Project {
+  tag: string;
+  lenses: string[];
+}
+
+/** Projects synced since `since`, newest first. */
+export async function listProjects(db: D1Database, since: number): Promise<Project[]> {
+  const { results } = await db
+    .prepare("SELECT tag, lenses FROM projects WHERE updated_at >= ? ORDER BY updated_at DESC LIMIT 20")
+    .bind(since)
+    .all<{ tag: string; lenses: string }>();
+  return results.map((r) => {
+    let lenses: unknown = [];
+    try {
+      lenses = JSON.parse(r.lenses);
+    } catch {
+      lenses = [];
+    }
+    return { tag: r.tag, lenses: Array.isArray(lenses) ? lenses.filter((l): l is string => typeof l === "string") : [] };
+  });
 }

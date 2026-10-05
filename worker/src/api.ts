@@ -1,12 +1,13 @@
 import { MAX_BODY, type Env } from "./env";
 import { safeEqual, sha256Hex } from "./auth";
-import { countByStatus, countWaitingByTag, getSetting, hitRateLimit, listItems, markDone, markSkipped, type Status, type TagFilter } from "./db";
+import { countByStatus, countWaitingByTag, getSetting, hitRateLimit, listItems, markDone, markSkipped, setProject, type Status, type TagFilter } from "./db";
 import { TAG_NAME_RE } from "./urls";
 import { ensureSchema } from "./schema";
 
 export const API_PER_MINUTE = 60;
 export const API_UNAUTH_PER_MINUTE = 120;
 const FIELD_MAX = 500;
+const MAX_PROJECT_LENSES = 24;
 const STATUSES: Status[] = ["waiting", "done", "skipped"];
 
 const json = (status: number, data: unknown) =>
@@ -63,6 +64,27 @@ export async function handleApi(req: Request, env: Env, now = Date.now()): Promi
     if (filter === "bad") return json(400, BAD_TAG);
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 50, 1), 200);
     return json(200, { items: await listItems(env.DB, status, limit, status !== "waiting", filter) });
+  }
+
+  // The skill sends a project's lens and collection names, for the bot's lens buttons.
+  // `-` is the project without a tag. Names only: nothing else about the project leaves the computer.
+  const project = path.match(/^\/api\/projects\/([a-z0-9-]{1,32})$/);
+  if (req.method === "PUT" && project) {
+    const key = project[1] === "-" ? "" : project[1];
+    if (key && !TAG_NAME_RE.test(key)) return json(400, { error: "project must be - or 1-32 letters, digits or hyphens" });
+    const raw = await req.text();
+    if (new TextEncoder().encode(raw).length > MAX_BODY) return json(413, { error: "body too large" });
+    let lenses: unknown;
+    try {
+      lenses = JSON.parse(raw)?.lenses;
+    } catch {
+      return json(400, { error: "body must be JSON" });
+    }
+    if (!Array.isArray(lenses) || lenses.length > MAX_PROJECT_LENSES || !lenses.every((l) => typeof l === "string" && TAG_NAME_RE.test(l))) {
+      return json(400, { error: `lenses must be up to ${MAX_PROJECT_LENSES} names of 1-32 lowercase letters, digits or hyphens` });
+    }
+    await setProject(env.DB, key, [...new Set(lenses as string[])], now);
+    return json(200, { ok: true });
   }
 
   const action = path.match(/^\/api\/items\/([a-z0-9]{1,40})\/(done|skip)$/);

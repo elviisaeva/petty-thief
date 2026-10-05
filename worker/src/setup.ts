@@ -6,6 +6,40 @@ import type { TgClient } from "./telegram";
 import { applyBranding } from "./branding";
 
 export const CLAIM_TTL_MS = 60 * 60 * 1000;
+/** Button taps arrive as callback_query updates; Telegram sends only the kinds listed here. */
+export const WEBHOOK_UPDATES = ["message", "callback_query"];
+
+/**
+ * Points Telegram at this worker with a fresh secret. The secret's hash is stored only after
+ * Telegram accepted it, so a failed attempt never breaks a working webhook.
+ */
+export async function registerWebhook(env: Env, tg: TgClient, origin: string, dropPending: boolean): Promise<any> {
+  const secret = newWebhookSecret();
+  const hook = await tg.call("setWebhook", {
+    url: `${origin}/telegram`,
+    secret_token: secret,
+    allowed_updates: WEBHOOK_UPDATES,
+    drop_pending_updates: dropPending,
+  });
+  if (hook?.ok) {
+    await setSetting(env.DB, "webhook_secret_hash", await sha256Hex(secret));
+    await setSetting(env.DB, "webhook_updates", WEBHOOK_UPDATES.join(","));
+  }
+  return hook;
+}
+
+/**
+ * Bots set up before the lens buttons registered for messages only. On the owner's next update,
+ * register again with button taps included. At most one try an hour if Telegram says no.
+ */
+export async function upgradeWebhook(env: Env, tg: TgClient, origin: string, now: number): Promise<void> {
+  if ((await getSetting(env.DB, "webhook_updates")) === WEBHOOK_UPDATES.join(",")) return;
+  if (!(await getSetting(env.DB, "owner_id"))) return;
+  const last = Number(await getSetting(env.DB, "webhook_upgrade_at")) || 0;
+  if (now - last >= 0 && now - last < 60 * 60 * 1000) return;
+  await setSetting(env.DB, "webhook_upgrade_at", String(now));
+  await registerWebhook(env, tg, origin, false);
+}
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -69,24 +103,16 @@ export async function handleSetup(req: Request, env: Env, tg: TgClient, now = Da
   }
 
   const origin = new URL(req.url).origin;
-  const secret = newWebhookSecret();
   let hook: any;
   try {
-    hook = await tg.call("setWebhook", {
-      url: `${origin}/telegram`,
-      secret_token: secret,
-      allowed_updates: ["message"],
-      drop_pending_updates: true,
-    });
+    hook = await registerWebhook(env, tg, origin, true);
   } catch {
     return page(502, "Telegram said no", "<p>Couldn't reach Telegram. Wait a moment and try again.</p>");
   }
   if (!hook?.ok) {
     return page(502, "Telegram said no", `<p>Telegram didn't accept the connection: ${esc(String(hook?.description ?? "no answer"))}</p><p>Check the bot token and try again.</p>`);
   }
-  // Stored only after Telegram accepted it, so a failed attempt never breaks a working webhook.
-  // An update that arrives in the few milliseconds before this write gets a 401 and is retried by Telegram.
-  await setSetting(env.DB, "webhook_secret_hash", await sha256Hex(secret));
+  // An update that arrives in the few milliseconds before the secret is stored gets a 401 and is retried by Telegram.
   await applyBranding(tg);
 
   // The webhook is already registered, so a failed getMe only costs us the bot's name.

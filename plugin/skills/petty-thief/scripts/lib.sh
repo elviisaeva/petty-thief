@@ -96,3 +96,51 @@ pt_tag_filter() {
 pt_valid_tag() {
   pt_one_line "$1" && printf '%s' "$1" | grep -Eq '^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$'
 }
+
+# pt_profile_list <key>: the items of a list setting, one per line, lowercased: `key: [a, b]` or
+# `key:` followed by `  - a` lines. The project profile wins when it has the key, as in pt_profile_value.
+# Only names of 1-32 lowercase letters, digits or hyphens are printed; anything else is dropped.
+pt_profile_list() {
+  for pt_f in "./.petty-thief/profile.yaml" "$HOME/.petty-thief/profile.yaml"; do
+    [ -r "$pt_f" ] || continue
+    grep -Eq "^[[:space:]]*$1:" "$pt_f" 2>/dev/null || continue
+    awk -v key="$1" '
+      function emit(s) { gsub(/^[[:space:]"'\'']+|[[:space:]"'\'']+$/, "", s); if (s != "") print tolower(s) }
+      inlist && /^[[:space:]]*-[[:space:]]/ { s = $0; sub(/^[[:space:]]*-[[:space:]]*/, "", s); sub(/[[:space:]]#.*$/, "", s); emit(s); next }
+      inlist && /^[[:space:]]*($|#)/ { next }
+      inlist { exit }
+      $0 ~ "^[[:space:]]*" key ":" {
+        s = $0; sub("^[[:space:]]*" key ":[[:space:]]*", "", s); sub(/[[:space:]]#.*$/, "", s)
+        if (s ~ /^\[/) { gsub(/[][]/, "", s); n = split(s, parts, ","); for (i = 1; i <= n; i++) emit(parts[i]); exit }
+        if (s == "") { inlist = 1; next }
+        emit(s); exit
+      }
+    ' "$pt_f" 2>/dev/null | grep -E '^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$' | head -n 24
+    return 0
+  done
+  return 0
+}
+
+# pt_sync_project: tells the bot this project's lens and collection names (the profile's `use`),
+# so its lens buttons match. Names only. Needs pt_load_config and pt_tag_filter first.
+# Sends only when the names changed or a week has passed, in the background, and never fails.
+pt_sync_project() {
+  pt_names=$(pt_profile_list use | awk '!seen[$0]++' | tr '\n' ',' | sed 's/,$//')
+  [ -n "$pt_names" ] || return 0
+  pt_body=$(printf '{"lenses":[%s]}' "$(printf '%s' "$pt_names" | sed 's/[^,][^,]*/"&"/g')")
+  pt_key=${PT_TAG:--}
+  pt_state="$(dirname "$PT_CONFIG")/.synced-$pt_key"
+  pt_now=$(date +%s)
+  if [ -f "$pt_state" ]; then
+    read -r pt_t pt_old < "$pt_state" 2>/dev/null
+    case "$pt_t" in '' | *[!0-9]* | ????????????*) pt_t=0 ;; esac
+    pt_t=${pt_t#"${pt_t%%[!0]*}"}
+    pt_age=$((pt_now - ${pt_t:-0}))
+    [ "$pt_old" = "$pt_body" ] && [ "$pt_age" -ge 0 ] && [ "$pt_age" -lt 604800 ] && return 0
+  fi
+  # Noted before sending, so two sessions starting together send once; a failed send clears it.
+  printf '%s %s\n' "$pt_now" "$pt_body" > "$pt_state" 2>/dev/null
+  (pt_curl 5 -X PUT -H 'content-type: application/json' --data-binary "$pt_body" "$PT_URL/api/projects/$pt_key" >/dev/null 2>&1 ||
+    rm -f "$pt_state") > /dev/null 2>&1 &
+  return 0
+}
