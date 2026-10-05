@@ -1,6 +1,6 @@
 import type { Env } from "./env";
 import { newClaimCode, newWebhookSecret, safeEqual, sha256Hex } from "./auth";
-import { getSetting, hitRateLimit, setSetting } from "./db";
+import { claimOnce, getSetting, hitRateLimit, setSetting } from "./db";
 import { ensureSchema } from "./schema";
 import type { TgClient } from "./telegram";
 import { applyBranding } from "./branding";
@@ -35,10 +35,11 @@ export async function registerWebhook(env: Env, tg: TgClient, origin: string, dr
 export async function upgradeWebhook(env: Env, tg: TgClient, origin: string, now: number): Promise<void> {
   if ((await getSetting(env.DB, "webhook_updates")) === WEBHOOK_UPDATES.join(",")) return;
   if (!(await getSetting(env.DB, "owner_id"))) return;
-  const last = Number(await getSetting(env.DB, "webhook_upgrade_at")) || 0;
-  if (now - last >= 0 && now - last < 60 * 60 * 1000) return;
-  await setSetting(env.DB, "webhook_upgrade_at", String(now));
-  await registerWebhook(env, tg, origin, false);
+  // Button taps and a message often arrive together: only one isolate may re-register, or two
+  // fresh secrets race and Telegram keeps one the database doesn't have.
+  if (!(await claimOnce(env.DB, "webhook_upgrade_at", now, 60 * 60 * 1000))) return;
+  const hook = await registerWebhook(env, tg, origin, false);
+  if (!hook?.ok) console.error("webhook upgrade refused:", String(hook?.description ?? "no answer").slice(0, 200));
 }
 
 const esc = (s: string) =>

@@ -204,6 +204,20 @@ export async function incrementSetting(db: D1Database, key: string): Promise<num
   return Number(row?.value ?? 1);
 }
 
+/**
+ * Atomically takes a once-per-`ttl` lock stored as a timestamp setting. Returns true for exactly
+ * one caller per window, even when several isolates ask at the same moment.
+ */
+export async function claimOnce(db: D1Database, key: string, now: number, ttl: number): Promise<boolean> {
+  const row = await db
+    .prepare(
+      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value WHERE CAST(settings.value AS INTEGER) <= ? OR CAST(settings.value AS INTEGER) > ? RETURNING value",
+    )
+    .bind(key, String(now), now - ttl, now)
+    .first<{ value: string }>();
+  return row !== null;
+}
+
 /** Counts a hit in `prefix:windowId`; returns false once the window has more than `max` hits. */
 export async function hitRateLimit(db: D1Database, prefix: string, windowId: number, max: number): Promise<boolean> {
   const bucket = `${prefix}:${windowId}`;

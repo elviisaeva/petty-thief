@@ -1,7 +1,7 @@
 {
   "name": "petty-thief",
   "displayName": "Petty Thief",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Stash links from Telegram and let Claude Code steal the ideas, formats and techniques. Never the content.",
   "author": { "name": "Elvira Isaieva", "url": "https://github.com/elviisaeva" },
   "repository": "https://github.com/elviisaeva/petty-thief",

@@ -9,7 +9,7 @@ export default {
     const { pathname } = new URL(req.url);
     if (pathname === "/telegram" && req.method === "POST") return handleWebhook(req, env, telegramClient(env.BOT_TOKEN));
     if (pathname === "/setup") return handleSetup(req, env, telegramClient(env.BOT_TOKEN));
-    if (pathname.startsWith("/api/")) return handleApi(req, env);
+    if (pathname.startsWith("/api/")) return handleApi(req, env, Date.now(), telegramClient(env.BOT_TOKEN));
     if (pathname === "/") {
       return new Response("Petty Thief is running. Open /setup to finish setting it up.", { headers: { "content-type": "text/plain; charset=utf-8" } });
     }

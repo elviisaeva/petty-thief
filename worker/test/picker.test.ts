@@ -151,6 +151,14 @@ describe("webhook upgrade for button taps", () => {
     expect(tg.calls.filter((c) => c.method === "setWebhook")).toHaveLength(1);
   });
 
+  it("re-registers only once when several updates arrive at the same moment", async () => {
+    const tg = fakeTg();
+    await Promise.all([1, 2, 3].map((i) => handleWebhook(post(msg(`https://a.com/p${i}`), SECRET), env, tg.client, NOW)));
+    const hooks = tg.calls.filter((c) => c.method === "setWebhook");
+    expect(hooks).toHaveLength(1);
+    expect(await db.getSetting(env.DB, "webhook_secret_hash")).toBe(await sha256Hex(hooks[0].body.secret_token));
+  });
+
   it("keeps the old secret when Telegram refuses, and waits an hour before trying again", async () => {
     const tg = fakeTg({ setWebhook: { ok: false, description: "nope" } });
     await handleWebhook(post(msg("https://a.com/1"), SECRET), env, tg.client, NOW);
@@ -190,5 +198,25 @@ describe("api: projects", () => {
   it("needs the token", async () => {
     const res = await SELF.fetch("https://pt.example.workers.dev/api/projects/brand", { method: "PUT", body: JSON.stringify({ lenses: [] }) });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("api: webhook refresh", () => {
+  const TOKEN = "pt_" + "hook".repeat(8);
+  beforeEach(async () => {
+    await db.setSetting(env.DB, "api_token_hash", await sha256Hex(TOKEN));
+    await seedOwner(env.DB);
+  });
+
+  it("re-registers with a new secret and reports Telegram's answer; needs the key", async () => {
+    const { handleApi } = await import("../src/api");
+    const tg = fakeTg({ setWebhook: { ok: true, description: "Webhook was set" } });
+    const req = (auth: boolean) => new Request(`${ORIGIN}/api/webhook`, { method: "POST", headers: auth ? { Authorization: `Bearer ${TOKEN}` } : {} });
+    expect((await handleApi(req(false), env, NOW, tg.client)).status).toBe(401);
+    const res = await handleApi(req(true), env, NOW, tg.client);
+    expect([res.status, await res.json()]).toEqual([200, { ok: true, telegram: "Webhook was set" }]);
+    const hook = tg.calls.find((c) => c.method === "setWebhook")!;
+    expect(hook.body.allowed_updates).toEqual(["message", "callback_query"]);
+    expect(await db.getSetting(env.DB, "webhook_secret_hash")).toBe(await sha256Hex(hook.body.secret_token));
   });
 });

@@ -3,6 +3,8 @@ import { safeEqual, sha256Hex } from "./auth";
 import { countByStatus, countWaitingByTag, getSetting, hitRateLimit, listItems, markDone, markSkipped, setProject, type Status, type TagFilter } from "./db";
 import { TAG_NAME_RE } from "./urls";
 import { ensureSchema } from "./schema";
+import { registerWebhook } from "./setup";
+import type { TgClient } from "./telegram";
 
 export const API_PER_MINUTE = 60;
 export const API_UNAUTH_PER_MINUTE = 120;
@@ -32,7 +34,7 @@ function tagFilter(params: URLSearchParams): TagFilter | undefined | "bad" {
 
 const BAD_TAG = { error: "tag must be 1-32 letters, digits or hyphens; untagged must be 0, 1, or only (without tag); by_tag must be 0 or 1" };
 
-export async function handleApi(req: Request, env: Env, now = Date.now()): Promise<Response> {
+export async function handleApi(req: Request, env: Env, now = Date.now(), tg?: TgClient): Promise<Response> {
   await ensureSchema(env.DB);
   const minute = Math.floor(now / 60_000);
 
@@ -64,6 +66,14 @@ export async function handleApi(req: Request, env: Env, now = Date.now()): Promi
     if (filter === "bad") return json(400, BAD_TAG);
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 50, 1), 200);
     return json(200, { items: await listItems(env.DB, status, limit, status !== "waiting", filter) });
+  }
+
+  // Re-registers the Telegram webhook with a fresh secret: the fix when the bot stops answering
+  // or its buttons don't react. The owner's API key proves who asks; Telegram's answer is returned.
+  if (req.method === "POST" && path === "/api/webhook" && tg) {
+    if (!(await getSetting(env.DB, "owner_id"))) return json(409, { error: "finish /setup first" });
+    const hook = await registerWebhook(env, tg, url.origin, false);
+    return json(hook?.ok ? 200 : 502, { ok: Boolean(hook?.ok), telegram: String(hook?.description ?? "no answer").slice(0, 200) });
   }
 
   // The skill sends a project's lens and collection names, for the bot's lens buttons.
